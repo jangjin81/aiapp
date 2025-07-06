@@ -1,8 +1,161 @@
+<!DOCTYPE html>
 <html>
 <head>
-<title>AI어플</title>
+    <title>Teachable Machine Image Model</title>
+    <style>
+        /* Basic styling for the entire page */
+        body {
+            display: flex; /* Use flexbox for easy centering */
+            flex-direction: column; /* Stack items vertically */
+            align-items: center; /* Center horizontally */
+            justify-content: center; /* Center vertically */
+            min-height: 100vh; /* Ensure it takes full viewport height */
+            margin: 0; /* Remove default body margin */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Modern, readable font */
+            background-color: #f0f2f5; /* Light grey background */
+            color: #333; /* Dark grey text color */
+            line-height: 1.6; /* Improve line spacing for readability */
+        }
+
+        /* Container for the main content */
+        #container {
+            background-color: #ffffff; /* White background for the card */
+            padding: 30px; /* More padding for a spacious feel */
+            border-radius: 12px; /* Slightly more rounded corners */
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1); /* Softer, more prominent shadow */
+            text-align: center; /* Center text within the container */
+            max-width: 400px; /* Limit overall width for better readability on large screens */
+            width: 90%; /* Responsive width */
+        }
+
+        /* Styling for the main title */
+        h1 {
+            color: #2c3e50; /* Darker blue-grey for heading */
+            margin-bottom: 25px; /* More space below heading */
+            font-size: 1.8em; /* Larger heading font size */
+        }
+
+        /* Styling for the Start button */
+        button {
+            background-color: #007bff; /* Vibrant blue */
+            color: white; /* White text */
+            padding: 12px 25px; /* Larger padding for a more clickable area */
+            border: none; /* No border */
+            border-radius: 8px; /* Rounded button corners */
+            cursor: pointer; /* Pointer on hover */
+            font-size: 1.1em; /* Slightly larger font */
+            font-weight: bold; /* Bold text */
+            margin-bottom: 25px; /* Space below the button */
+            transition: background-color 0.3s ease, transform 0.2s ease; /* Smooth hover effects */
+            box-shadow: 0 4px 8px rgba(0, 123, 255, 0.2); /* Soft shadow for button */
+        }
+
+        button:hover {
+            background-color: #0056b3; /* Darker blue on hover */
+            transform: translateY(-2px); /* Slight lift effect on hover */
+        }
+
+        button:active {
+            transform: translateY(0); /* Press down effect on click */
+        }
+
+        /* Container for the webcam feed */
+        #webcam-container {
+            margin-bottom: 25px; /* Space below webcam */
+            border: 2px solid #ddd; /* Clearer border around webcam */
+            border-radius: 8px; /* Match container's border-radius */
+            overflow: hidden; /* Ensures canvas fits perfectly */
+            width: 200px; /* Fixed width for webcam */
+            height: 200px; /* Fixed height for webcam */
+            display: flex; /* Flexbox to ensure canvas is centered if needed */
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Ensure webcam canvas itself is styled correctly */
+        #webcam-container canvas {
+            display: block; /* Removes extra space below canvas */
+        }
+
+        /* Container for the prediction labels */
+        #label-container {
+            width: 100%; /* Take full width of parent container */
+        }
+
+        /* Styling for individual prediction labels */
+        #label-container div {
+            padding: 10px 15px; /* More padding */
+            margin: 10px 0; /* More vertical space between labels */
+            background-color: #e9f5ff; /* Very light blue background for labels */
+            border-left: 5px solid #007bff; /* Left border for visual accent */
+            border-radius: 5px; /* Slight border radius */
+            font-size: 1.15em; /* Larger, more readable font size */
+            color: #333; /* Darker text for labels */
+            font-weight: 500; /* Medium font weight for better readability */
+            display: flex; /* Use flexbox to align content */
+            justify-content: center; /* Center text within the label */
+            align-items: center;
+        }
+    </style>
 </head>
 <body>
-아무거나 글자를 입력해보세요.
-</body>  
+    <div id="container">
+        <h1>Teachable Machine Image Model</h1>
+        <button type="button" onclick="init()">Start Webcam</button>
+        <div id="webcam-container"></div>
+        <div id="label-container"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <script type="text/javascript">
+        // Your Teachable Machine model URL
+        const URL = "https://teachablemachine.withgoogle.com/models/CorIZW6gn-/";
+
+        let model, webcam, labelContainer, maxPredictions;
+
+        // Initialize the model and webcam
+        async function init() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            // Load the model
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            // Set up the webcam
+            const flip = true; // Whether to flip the webcam horizontally
+            webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
+            await webcam.setup(); // Request access to the webcam
+            await webcam.play(); // Start playing the webcam feed
+            window.requestAnimationFrame(loop); // Start the prediction loop
+
+            // Append webcam feed to the DOM
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+
+            // Create prediction label elements
+            labelContainer = document.getElementById("label-container");
+            for (let i = 0; i < maxPredictions; i++) {
+                labelContainer.appendChild(document.createElement("div"));
+            }
+        }
+
+        // Main prediction loop
+        async function loop() {
+            webcam.update(); // Update the webcam frame
+            await predict(); // Run prediction
+            window.requestAnimationFrame(loop); // Continue the loop
+        }
+
+        // Run the webcam image through the model
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction =
+                    prediction[i].className + ": " + (prediction[i].probability * 100).toFixed(1) + "%"; // Format as percentage
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+            }
+        }
+    </script>
+</body>
 </html>
